@@ -17,7 +17,7 @@
     "http://127.0.0.1:8000/"
   ],
   "oauth2": {
-    "client_id": "837408117357-stfef9t66kd0bk5itqaajdohclf2j97m.apps.googleusercontent.com",
+    "client_id": "837408117357-kn96s6bsea37l3aa6bt40t0tnhrgtlk5.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/gmail.readonly"
     ]
