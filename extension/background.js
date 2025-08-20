@@ -1,4 +1,33 @@
 // This file is the extension's service worker and it runs in the background and handles events and long-running tasks
+// Decodes a Base64-encoded string that is safe for URLs
+// Gmail API returns body content in this format
+function base64UrlDecode(str) {
+  // Replace URL-safe characters with standard Base64 characters
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  return atob(str);
+}
+
+// Fetches the full content of a single email message and logs its details
+async function fetchMessageDetails(token, messageId) {
+  console.log(`Fetching details for message ID: ${messageId}`);
+  const response = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  const message = await response.json();
+
+  // Extract key information from the complex message object
+  const headers = message.payload.headers;
+  const subject = headers.find(h => h.name.toLowerCase() === 'subject')?.value || 'No Subject';
+  const sender = headers.find(h => h.name.toLowerCase() === 'from')?.value || 'Unknown Sender';
+
+  // The body is often in parts, we look for the plain text version
+  const textPart = message.payload.parts?.find(p => p.mimeType === 'text/plain');
+  const bodyData = textPart?.body?.data || message.payload.body?.data || '';
+  const body = bodyData ? base64UrlDecode(bodyData) : 'No Body';
+
+  console.log({ subject, sender, body: body.substring(0, 250) + '...' });
+}
+
 // Fetches the user's unread email message IDs from the Gmail API
 async function fetchUnreadMessageIds(token) {
   console.log('Fetching unread emails...');
@@ -18,14 +47,19 @@ async function fetchUnreadMessageIds(token) {
     const data = await response.json();
     console.log('API response for message IDs:', data);
 
-    // The next step will be to take these IDs and fetch the full content for each one
+    if (data.messages && data.messages.length > 0) {
+      // For now, process the very first unread email as a test
+      const firstMessageId = data.messages[0].id;
+      await fetchMessageDetails(token, firstMessageId);
+    } else {
+      console.log('No unread emails found.');
+    }
   } catch (error) {
     console.error('Error fetching emails:', error);
   }
 }
 
 // Initiates the Google OAuth2 flow to get a token
-// The 'interactive: true' flag will prompt the user to login and grant permissions if they haven't already
 function getAuthToken() {
   chrome.identity.getAuthToken({ interactive: true }, (token) => {
     if (chrome.runtime.lastError) {
