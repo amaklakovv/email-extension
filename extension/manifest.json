@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Email Summarizer Extension",
+  "name": "Email Summariser Extension",
   "version": "0.1.0",
-  "description": "Summarizes unread emails and drafts replies.",
+  "description": "Summarises unread emails and drafts replies.",
   "action": {
     "default_popup": "popup.html"
   },
