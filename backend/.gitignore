@@ -1,7 +1,0 @@
-# Python virtual environment
-venv/
-# Environment variables
-.env
-
-# Mac
-.DS_Store

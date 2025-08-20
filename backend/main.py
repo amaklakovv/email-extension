@@ -54,10 +54,13 @@ async def summarize_email(email: Email) -> SummaryResponse:
     """
 
     try:
-        response = await model.generate_content_async(prompt)
-        # Clean up potential markdown formatting from the response
-        cleaned_text = response.text.strip().replace("```json", "").replace("```", "")
-        response_data = json.loads(cleaned_text)
+        # Configure the model to return a JSON response directly
+        generation_config = genai.GenerationConfig(response_mime_type="application/json")
+        response = await model.generate_content_async(
+            prompt,
+            generation_config=generation_config
+        )
+        response_data = json.loads(response.text)
         return SummaryResponse(**response_data)
     except (json.JSONDecodeError, ValidationError) as e:
         raise HTTPException(status_code=500, detail=f"Error parsing Gemini's response: {e}")

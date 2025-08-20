@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Email Summarizer Extension",
+  "version": "0.1.0",
+  "description": "Summarizes unread emails and drafts replies.",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "identity",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8000/"
+  ],
+  "oauth2": {
+    "client_id": "837408117357-stfef9t66kd0bk5itqaajdohclf2j97m.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.readonly"
+    ]
+  }
+}
