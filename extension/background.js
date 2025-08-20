@@ -1,13 +1,32 @@
 // This file is the extension's service worker and it runs in the background and handles events and long-running tasks
+
 // Decodes a Base64-encoded string that is safe for URLs
 // Gmail API returns body content in this format
 function base64UrlDecode(str) {
-  // Replace URL-safe characters with standard Base64 characters
   str = str.replace(/-/g, '+').replace(/_/g, '/');
   return atob(str);
 }
 
-// Fetches the full content of a single email message and logs its details
+// Sends email data to the backend API for summarisation
+async function summarizeEmailWithBackend(emailData) {
+  console.log('Sending email to backend for summarisation...');
+  try {
+    const response = await fetch('http://127.0.0.1:8000/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(emailData),
+    });
+
+    if (!response.ok) throw new Error(`Backend responded with ${response.status}: ${await response.text()}`);
+
+    const summaryData = await response.json();
+    console.log('SUCCESS: Received summary from backend:', summaryData);
+  } catch (error) {
+    console.error('ERROR: Could not summarise email:', error);
+  }
+}
+
+// Fetches the full content of a single email message, then sends it for summarisation
 async function fetchMessageDetails(token, messageId) {
   console.log(`Fetching details for message ID: ${messageId}`);
   const response = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`, {
@@ -20,19 +39,20 @@ async function fetchMessageDetails(token, messageId) {
   const subject = headers.find(h => h.name.toLowerCase() === 'subject')?.value || 'No Subject';
   const sender = headers.find(h => h.name.toLowerCase() === 'from')?.value || 'Unknown Sender';
 
-  // The body is often in parts, we look for the plain text version
+  // The body is often in parts so this looks for the plain text version
   const textPart = message.payload.parts?.find(p => p.mimeType === 'text/plain');
   const bodyData = textPart?.body?.data || message.payload.body?.data || '';
   const body = bodyData ? base64UrlDecode(bodyData) : 'No Body';
 
-  console.log({ subject, sender, body: body.substring(0, 250) + '...' });
+  // Now send this data to the backend for summarisation
+  await summarizeEmailWithBackend({ subject, sender, body });
 }
 
 // Fetches the user's unread email message IDs from the Gmail API
 async function fetchUnreadMessageIds(token) {
   console.log('Fetching unread emails...');
   try {
-    // The 'q' parameter filters for unread messages. We also limit to 5 for now to keep it simple
+    // The 'q' parameter filters for unread messages limited to 5 for now
     const response = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5', {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -48,7 +68,7 @@ async function fetchUnreadMessageIds(token) {
     console.log('API response for message IDs:', data);
 
     if (data.messages && data.messages.length > 0) {
-      // For now, process the very first unread email as a test
+      // Process the very first unread email as a test for now
       const firstMessageId = data.messages[0].id;
       await fetchMessageDetails(token, firstMessageId);
     } else {
@@ -67,12 +87,12 @@ function getAuthToken() {
       return;
     }
     console.log('Successfully received auth token:', token);
-    // Now that we have the token, let's use it to fetch the list of unread emails
+    // Now that we have the token we can use it to fetch the list of unread emails
     fetchUnreadMessageIds(token);
   });
 }
 
-// Listen for messages from other parts of the extension, like the popup
+// Listen for messages from other parts of the extension like the popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'login') {
     getAuthToken();
