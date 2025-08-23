@@ -1,6 +1,7 @@
 import os
 import json
 from fastapi import FastAPI, HTTPException
+import asyncio
 from pydantic import BaseModel, ValidationError
 from dotenv import load_dotenv
 import google.generativeai as genai
@@ -38,30 +39,32 @@ class SummaryResponse(BaseModel):
 def read_root():
     return {"status": "ok"}
 
-# Create the endpoint to summarize an email
-@app.post("/summarize")
-async def summarize_email(email: Email) -> SummaryResponse:
+# Create the endpoint to summarise an email
+@app.post("/summarize", response_model=list[SummaryResponse])
+async def summarize_emails(emails: list[Email]) -> list[SummaryResponse]:
     if not model:
         raise HTTPException(status_code=500, detail="Gemini API not configured. Check GEMINI_API_KEY.")
 
-    prompt = f"""
-    Analyze the following email and provide a concise summary and a polite, brief reply draft.
-    Return the output as a single, clean JSON object with two keys: "summary" and "reply_draft".
+    async def generate_single_summary(email: Email):
+        prompt = f"""
+        Analyze the following email and provide a concise summary and a polite, brief reply draft.
+        Return the output as a single, clean JSON object with two keys: "summary" and "reply_draft".
 
-    Email from: {email.sender}
-    Subject: {email.subject}
-    Body: {email.body}
-    """
+        Email from: {email.sender}
+        Subject: {email.subject}
+        Body: {email.body}
+        """
+        generation_config = genai.GenerationConfig(response_mime_type="application/json")
+        return await model.generate_content_async(prompt, generation_config=generation_config)
 
     try:
-        # Configure the model to return a JSON response directly
-        generation_config = genai.GenerationConfig(response_mime_type="application/json")
-        response = await model.generate_content_async(
-            prompt,
-            generation_config=generation_config
-        )
-        response_data = json.loads(response.text)
-        return SummaryResponse(**response_data)
+        # Create and run all summarisation tasks concurrently
+        tasks = [generate_single_summary(email) for email in emails]
+        responses = await asyncio.gather(*tasks)
+
+        # Process responses
+        summaries = [SummaryResponse(**json.loads(res.text)) for res in responses]
+        return summaries
     except (json.JSONDecodeError, ValidationError) as e:
         raise HTTPException(status_code=500, detail=f"Error parsing Gemini's response: {e}")
     except Exception as e:

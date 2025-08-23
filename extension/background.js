@@ -8,28 +8,28 @@ function base64UrlDecode(str) {
 }
 
 // Sends email data to the backend API for summarisation
-async function summarizeEmailWithBackend(emailData) {
-  console.log('Sending email to backend for summarisation...');
+async function summarizeEmailsWithBackend(emailsData) {
+  console.log(`Sending ${emailsData.length} email(s) to backend for summarisation...`);
   try {
     const response = await fetch('http://127.0.0.1:8000/summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(emailData),
+      body: JSON.stringify(emailsData),
     });
 
     if (!response.ok) throw new Error(`Backend responded with ${response.status}: ${await response.text()}`);
 
-    const summaryData = await response.json();
-    console.log('SUCCESS: Received summary from backend:', summaryData);
-    // Store the summary so the popup can access it
-    await chrome.storage.session.set({ lastSummary: summaryData });
+    const summaries = await response.json();
+    console.log('SUCCESS: Received summaries from backend:', summaries);
+    // Store the list of summaries so the popup can access it
+    await chrome.storage.session.set({ summariesList: summaries });
   } catch (error) {
-    console.error('ERROR: Could not summarise email:', error);
-    await chrome.storage.session.remove('lastSummary');
+    console.error('ERROR: Could not summarise emails:', error);
+    await chrome.storage.session.remove('summariesList');
   }
 }
 
-// Fetches the full content of a single email message, then sends it for summarisation
+// Fetches the full content of a single email message and returns its details
 async function fetchMessageDetails(token, messageId) {
   console.log(`Fetching details for message ID: ${messageId}`);
   const response = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`, {
@@ -47,8 +47,7 @@ async function fetchMessageDetails(token, messageId) {
   const bodyData = textPart?.body?.data || message.payload.body?.data || '';
   const body = bodyData ? base64UrlDecode(bodyData) : 'No Body';
 
-  // Now send this data to the backend for summarisation
-  await summarizeEmailWithBackend({ subject, sender, body });
+  return { subject, sender, body };
 }
 
 // Fetches the user's unread email message IDs from the Gmail API
@@ -71,11 +70,15 @@ async function fetchUnreadMessageIds(token) {
     console.log('API response for message IDs:', data);
 
     if (data.messages && data.messages.length > 0) {
-      // Process the very first unread email as a test for now
-      const firstMessageId = data.messages[0].id;
-      await fetchMessageDetails(token, firstMessageId);
+      // Fetch details for all messages concurrently
+      const detailPromises = data.messages.map(message => fetchMessageDetails(token, message.id));
+      const emailDetails = await Promise.all(detailPromises);
+
+      // Now send the collected details to the backend in one batch
+      await summarizeEmailsWithBackend(emailDetails);
     } else {
       console.log('No unread emails found.');
+      await chrome.storage.session.set({ summariesList: [] }); // Store empty array for popup
     }
   } catch (error) {
     console.error('Error fetching emails:', error);
