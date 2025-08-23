@@ -21,8 +21,18 @@ async function summarizeEmailsWithBackend(emailsData) {
 
     const summaries = await response.json();
     console.log('SUCCESS: Received summaries from backend:', summaries);
+
+    // Combine original email details with the summaries received from the backend
+    const combinedData = emailsData.map((email, index) => ({
+      messageId: email.messageId,
+      subject: email.subject,
+      sender: email.sender,
+      summary: summaries[index].summary,
+      reply_draft: summaries[index].reply_draft,
+    }));
+
     // Store the list of summaries so the popup can access it
-    await chrome.storage.session.set({ summariesList: summaries });
+    await chrome.storage.session.set({ summariesList: combinedData });
   } catch (error) {
     console.error('ERROR: Could not summarise emails:', error);
     await chrome.storage.session.remove('summariesList');
@@ -47,7 +57,7 @@ async function fetchMessageDetails(token, messageId) {
   const bodyData = textPart?.body?.data || message.payload.body?.data || '';
   const body = bodyData ? base64UrlDecode(bodyData) : 'No Body';
 
-  return { subject, sender, body };
+  return { messageId, subject, sender, body };
 }
 
 // Fetches the user's unread email message IDs from the Gmail API
