@@ -21,8 +21,11 @@ async function summarizeEmailWithBackend(emailData) {
 
     const summaryData = await response.json();
     console.log('SUCCESS: Received summary from backend:', summaryData);
+    // Store the summary so the popup can access it
+    await chrome.storage.session.set({ lastSummary: summaryData });
   } catch (error) {
     console.error('ERROR: Could not summarise email:', error);
+    await chrome.storage.session.remove('lastSummary');
   }
 }
 

@@ -6,12 +6,33 @@
     body {
       width: 300px;
       font-family: sans-serif;
+      padding: 10px;
+    }
+    #summary-container {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 10px;
+      display: none;
+    }
+    h2 {
+      font-size: 1em;
+      margin-top: 0;
+    }
+    p {
+      font-size: 0.9em;
     }
   </style>
 </head>
 <body>
   <h1>Email Summariser</h1>
   <button id="login-button">Login with Google</button>
+  <div id="summary-container">
+    <h2>Latest Summary</h2>
+    <p id="summary-content"></p>
+    <h2>Draft Reply</h2>
+    <p id="reply-content"></p>
+  </div>
+  <div id="status-message"></div>
   <script src="popup.js" defer></script>
 </body>
 </html>
