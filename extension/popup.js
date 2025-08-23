@@ -2,38 +2,63 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginButton = document.getElementById('login-button');
   const summariesContainer = document.getElementById('summaries-container');
   const statusMessage = document.getElementById('status-message');
+  const loader = document.getElementById('loader');
 
-  // Try to get the list of summaries from storage when the popup opens
-  chrome.storage.session.get(['summariesList'], (result) => {
-    if (chrome.runtime.lastError) {
-      console.error('Error retrieving from storage:', chrome.runtime.lastError);
-      statusMessage.textContent = 'Error loading data.';
-      return;
-    }
+  // UI State Management
 
-    const summaries = result.summariesList;
+  function showLoadingState() {
+    loginButton.style.display = 'none';
+    summariesContainer.style.display = 'none';
+    statusMessage.textContent = 'Fetching summaries...';
+    loader.style.display = 'block';
+  }
+
+  function showLoginState() {
+    loader.style.display = 'none';
+    summariesContainer.innerHTML = '';
+    summariesContainer.style.display = 'block';
+    loginButton.style.display = 'block';
+    statusMessage.textContent = 'Click login to fetch your unread emails.';
+  }
+
+  function showSummariesState(summaries) {
+    loader.style.display = 'none';
+    loginButton.style.display = 'none';
+    statusMessage.textContent = '';
+    summariesContainer.innerHTML = '';
+    summariesContainer.style.display = 'block';
 
     if (summaries && summaries.length > 0) {
-      loginButton.style.display = 'none'; // Hide login button if we have data
-      statusMessage.textContent = '';
-
-      // Clear any previous summaries before rendering new ones
-      summariesContainer.innerHTML = '';
       summaries.forEach(item => renderSummaryItem(item));
-    } else if (summaries) { // It's an empty array
-      statusMessage.textContent = 'Inbox zero! No unread emails to summarise.';
-      loginButton.style.display = 'none'; // Hide login button if we have data
     } else {
-      statusMessage.textContent = 'No summary available. Click login to fetch emails.';
+      statusMessage.textContent = 'Inbox zero! No unread emails to summarise.';
     }
-  });
+  }
+
+  // Main function to update the UI by reading from storage
+  function updateUI() {
+    chrome.storage.session.get(['summariesList'], (result) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error retrieving from storage:', chrome.runtime.lastError);
+        statusMessage.textContent = 'Error loading data.';
+        return;
+      }
+
+      const summaries = result.summariesList;
+      if (summaries) { // This includes an empty array, meaning a successful fetch occurred
+        showSummariesState(summaries);
+      } else { // summaries is undefined/null, meaning we need to log in
+        showLoginState();
+      }
+    });
+  }
+
+  // Event Listeners
 
   loginButton.addEventListener('click', () => {
+    showLoadingState();
     // Send a message to the background script to start the auth flow
     chrome.runtime.sendMessage({ action: 'login' });
-    statusMessage.textContent = 'Fetching emails... Please reopen the popup in a moment.';
-    // We don't close the window immediately so the user can see the status message
-    setTimeout(() => window.close(), 2000);
   });
 
   // Renders a single summary card with its content and copy buttons
@@ -97,4 +122,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     return button;
   }
+
+  // Listen for messages from the background script (for example when summaries are ready)
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'summariesUpdated') {
+      console.log('Popup received summariesUpdated message. Updating UI.');
+      updateUI();
+    }
+  });
+
+  // Initial UI update when the popup is opened
+  updateUI();
 });

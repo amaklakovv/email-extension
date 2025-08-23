@@ -10,33 +10,28 @@ function base64UrlDecode(str) {
 // Sends email data to the backend API for summarisation
 async function summarizeEmailsWithBackend(emailsData) {
   console.log(`Sending ${emailsData.length} email(s) to backend for summarisation...`);
-  try {
-    const response = await fetch('http://127.0.0.1:8000/summarize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(emailsData),
-    });
+  const response = await fetch('http://127.0.0.1:8000/summarize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(emailsData),
+  });
 
-    if (!response.ok) throw new Error(`Backend responded with ${response.status}: ${await response.text()}`);
+  if (!response.ok) throw new Error(`Backend responded with ${response.status}: ${await response.text()}`);
 
-    const summaries = await response.json();
-    console.log('SUCCESS: Received summaries from backend:', summaries);
+  const summaries = await response.json();
+  console.log('SUCCESS: Received summaries from backend:', summaries);
 
-    // Combine original email details with the summaries received from the backend
-    const combinedData = emailsData.map((email, index) => ({
-      messageId: email.messageId,
-      subject: email.subject,
-      sender: email.sender,
-      summary: summaries[index].summary,
-      reply_draft: summaries[index].reply_draft,
-    }));
+  // Combine original email details with the summaries received from the backend
+  const combinedData = emailsData.map((email, index) => ({
+    messageId: email.messageId,
+    subject: email.subject,
+    sender: email.sender,
+    summary: summaries[index].summary,
+    reply_draft: summaries[index].reply_draft,
+  }));
 
-    // Store the list of summaries so the popup can access it
-    await chrome.storage.session.set({ summariesList: combinedData });
-  } catch (error) {
-    console.error('ERROR: Could not summarise emails:', error);
-    await chrome.storage.session.remove('summariesList');
-  }
+  // Store the list of summaries so the popup can access it
+  await chrome.storage.session.set({ summariesList: combinedData });
 }
 
 // Fetches the full content of a single email message and returns its details
@@ -73,6 +68,11 @@ async function fetchUnreadMessageIds(token) {
 
     if (!response.ok) {
       const errorData = await response.json();
+      // If token is invalid (401), we should try to remove it before the next attempt
+      if (response.status === 401) {
+        console.log('Auth token invalid, removing cached token.');
+        await new Promise(resolve => chrome.identity.removeCachedAuthToken({ token }, resolve));
+      }
       throw new Error(`Gmail API responded with ${response.status}: ${errorData.error.message}`);
     }
 
@@ -80,30 +80,34 @@ async function fetchUnreadMessageIds(token) {
     console.log('API response for message IDs:', data);
 
     if (data.messages && data.messages.length > 0) {
-      // Fetch details for all messages concurrently
       const detailPromises = data.messages.map(message => fetchMessageDetails(token, message.id));
       const emailDetails = await Promise.all(detailPromises);
-
-      // Now send the collected details to the backend in one batch
       await summarizeEmailsWithBackend(emailDetails);
     } else {
       console.log('No unread emails found.');
       await chrome.storage.session.set({ summariesList: [] }); // Store empty array for popup
     }
   } catch (error) {
-    console.error('Error fetching emails:', error);
+    console.error('Error during fetch/summarize process:', error);
+    // Clear storage on any error to ensure a clean state for the next attempt
+    await chrome.storage.session.remove('summariesList');
+  } finally {
+    // ALWAYS notify the popup that the process is complete, so it can update its UI.
+    console.log('Process finished, notifying popup.');
+    chrome.runtime.sendMessage({ action: 'summariesUpdated' });
   }
 }
 
 // Initiates the Google OAuth2 flow to get a token
 function getAuthToken() {
   chrome.identity.getAuthToken({ interactive: true }, (token) => {
-    if (chrome.runtime.lastError) {
+    if (chrome.runtime.lastError || !token) {
       console.error('getAuthToken error:', chrome.runtime.lastError.message);
+      // If user cancels the auth dialog, notify the popup to stop the loading state.
+      chrome.runtime.sendMessage({ action: 'summariesUpdated' });
       return;
     }
     console.log('Successfully received auth token:', token);
-    // Now that we have the token we can use it to fetch the list of unread emails
     fetchUnreadMessageIds(token);
   });
 }
