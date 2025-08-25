@@ -3,11 +3,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const summariesContainer = document.getElementById('summaries-container');
   const statusMessage = document.getElementById('status-message');
   const loader = document.getElementById('loader');
+  const refreshButton = document.getElementById('refresh-button');
 
   // UI State Management
 
   function showLoadingState() {
     loginButton.style.display = 'none';
+    refreshButton.style.display = 'none';
     summariesContainer.style.display = 'none';
     statusMessage.textContent = 'Fetching summaries...';
     loader.style.display = 'block';
@@ -15,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function showLoginState() {
     loader.style.display = 'none';
+    refreshButton.style.display = 'none';
     summariesContainer.innerHTML = '';
     summariesContainer.style.display = 'block';
     loginButton.style.display = 'block';
@@ -24,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function showSummariesState(summaries) {
     loader.style.display = 'none';
     loginButton.style.display = 'none';
+    refreshButton.style.display = 'block';
     statusMessage.textContent = '';
     summariesContainer.innerHTML = '';
     summariesContainer.style.display = 'block';
@@ -61,6 +65,11 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.sendMessage({ action: 'login' });
   });
 
+  refreshButton.addEventListener('click', () => {
+    showLoadingState();
+    // Use the cached token if available and only prompt the user if needed
+    chrome.runtime.sendMessage({ action: 'login' });
+  });
   // Renders a single summary card with its content and copy buttons
   function renderSummaryItem(item) {
     const container = document.createElement('div');
