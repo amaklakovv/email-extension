@@ -27,16 +27,28 @@
       color: #fff;
       margin: 0;
     }
-    #refresh-button {
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #refresh-button, #options-button {
       background: none;
       border: none;
       color: #f0f0f0;
-      font-size: 1.6em;
       cursor: pointer;
-      padding: 0 5px;
-      display: none; /* Hidden by default */
     }
-    #refresh-button:hover {
+    #refresh-button {
+      font-size: 0.9em;
+      padding: 4px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      display: none;
+    }
+    #options-button {
+      font-size: 1.5em;
+    }
+    #refresh-button:hover, #options-button:hover {
       opacity: 0.8;
     }
     #loader {
@@ -47,7 +59,7 @@
       height: 30px;
       animation: spin 1s linear infinite;
       margin: 20px auto;
-      display: none; /* Hidden by default */
+      display: none;
     }
     @keyframes spin {
       to {
@@ -140,7 +152,10 @@
 <body>
   <div class="header-container">
     <h1>Email Summariser</h1>
-    <button id="refresh-button" title="Refresh Summaries">Refresh</button>
+    <div class="header-actions">
+      <button id="refresh-button" title="Refresh Summaries">Refresh</button>
+      <button id="options-button" title="Settings">Options</button>
+    </div>
   </div>
   <div id="loader"></div>
   <button id="login-button">Login with Google</button>

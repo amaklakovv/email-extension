@@ -2,9 +2,14 @@
   "manifest_version": 3,
   "name": "Email Summariser Extension",
   "version": "0.1.0",
+  "author": "Andrew Maklakov",
   "description": "Summarises unread emails and drafts replies.",
   "action": {
     "default_popup": "popup.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   },
   "background": {
     "service_worker": "background.js"
@@ -22,5 +27,8 @@
     "scopes": [
       "https://www.googleapis.com/auth/gmail.readonly"
     ]
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
   }
 }

@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusMessage = document.getElementById('status-message');
   const loader = document.getElementById('loader');
   const refreshButton = document.getElementById('refresh-button');
+  const optionsButton = document.getElementById('options-button');
 
   // UI State Management
 
@@ -70,6 +71,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Use the cached token if available and only prompt the user if needed
     chrome.runtime.sendMessage({ action: 'login' });
   });
+
+  optionsButton.addEventListener('click', () => {
+    chrome.runtime.openOptionsPage();
+  });
+
   // Renders a single summary card with its content and copy buttons
   function renderSummaryItem(item) {
     const container = document.createElement('div');
