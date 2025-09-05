@@ -1,5 +1,29 @@
 // This file is the extension's service worker and it runs in the background and handles events and long-running tasks
 
+// MOCK DATA FOR DEVELOPMENT
+// Set to `true` to use mock data and bypass Google login and backend calls
+// Set to `false` for production or to test with real data
+const USE_MOCK_DATA = true;
+
+const MOCK_SUMMARIES = [
+  {
+    messageId: 'mock123abc',
+    subject: 'Mock Email: Project Update',
+    sender: 'team@example.com',
+    summary: 'This is a mock summary for the project update. We are on track to meet the Q3 deadline. All major components are integrated and passing initial tests.',
+    reply_draft: 'Thanks for the update! Glad to hear we are on track. Let me know if the design team can help with anything.'
+  },
+  {
+    messageId: 'mock456def',
+    subject: 'Re: Your recent order',
+    sender: 'support@example.com',
+    summary: 'A mock summary regarding your recent order. It has been shipped via Express Courier and is expected to arrive in 2-3 business days.',
+    reply_draft: 'Thank you for letting me know. I look forward to receiving it.'
+  }
+];
+
+// END MOCK DATA
+
 // Decodes a Base64-encoded string that is safe for URLs
 // Gmail API returns body content in this format
 function base64UrlDecode(str) {
@@ -98,8 +122,24 @@ async function fetchUnreadMessageIds(token) {
   }
 }
 
+// Injects mock data for development purposes bypassing the real API calls
+async function useMockData() {
+  console.log('USING MOCK DATA');
+  // Simulate network delay to show the loading spinner in the popup
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  await chrome.storage.session.set({ summariesList: MOCK_SUMMARIES });
+  console.log('Mock summaries stored. Notifying popup.');
+  chrome.runtime.sendMessage({ action: 'summariesUpdated' });
+}
+
 // Initiates the Google OAuth2 flow to get a token
 function getAuthToken() {
+  if (USE_MOCK_DATA) {
+    useMockData();
+    return;
+  }
+
   chrome.identity.getAuthToken({ interactive: true }, (token) => {
     if (chrome.runtime.lastError || !token) {
       console.error('getAuthToken error:', chrome.runtime.lastError.message);
