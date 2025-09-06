@@ -5,15 +5,13 @@
   <style>
     body {
       width: 350px;
-      margin: 0; /* Remove default browser margin */
+      margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
       padding: 15px;
-      /* Using a solid, dark background for much better text contrast */
       background: #282a36;
       box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
       border: 1px solid rgba(255, 255, 255, 0.18);
       color: #f0f0f0;
-      /* A subtle text-shadow on all text improves readability */
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
     }
     .header-container {
@@ -39,14 +37,13 @@
       cursor: pointer;
     }
     #refresh-button {
+      display: none;
+    }
+    #refresh-button, #options-button {
       font-size: 0.9em;
       padding: 4px 10px;
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 6px;
-      display: none;
-    }
-    #options-button {
-      font-size: 1.5em;
     }
     #refresh-button:hover, #options-button:hover {
       opacity: 0.8;
@@ -147,6 +144,33 @@
       padding: 20px;
       font-size: 0.9em;
     }
+
+    /* Options view */
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    input[type="number"] {
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      width: 80px;
+      background-color: #f0f0f0;
+      color: #282a36;
+    }
+    #save-button.copy-button {
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+    #status {
+      margin-top: 15px;
+      font-style: italic;
+      min-height: 1em;
+    }
   </style>
 </head>
 <body>
@@ -157,10 +181,24 @@
       <button id="options-button" title="Settings">Options</button>
     </div>
   </div>
-  <div id="loader"></div>
-  <button id="login-button">Login with Google</button>
-  <div id="summaries-container"></div>
-  <div id="status-message"></div>
+
+  <div id="main-view">
+    <div id="loader"></div>
+    <button id="login-button">Login with Google</button>
+    <div id="summaries-container"></div>
+    <div id="status-message"></div>
+  </div>
+
+  <div id="options-view" style="display: none;">
+    <h2>Settings</h2>
+    <div class="form-group">
+      <label for="max-emails">Max emails to summarise:</label>
+      <input type="number" id="max-emails" name="max-emails" min="1" max="25">
+    </div>
+    <button id="save-button" class="copy-button">Save</button>
+    <div id="status"></div>
+    <button id="back-button" class="copy-button">Back</button>
+  </div>
   <script src="popup.js" defer></script>
 </body>
 </html>

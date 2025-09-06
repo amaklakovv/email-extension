@@ -83,8 +83,12 @@ async function fetchMessageDetails(token, messageId) {
 async function fetchUnreadMessageIds(token) {
   console.log('Fetching unread emails...');
   try {
-    // The 'q' parameter filters for unread messages limited to 5 for now
-    const response = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5', {
+    // Get user-defined maxResults from storage, with a default of 5
+    const { maxEmails } = await chrome.storage.sync.get({ maxEmails: 5 });
+    console.log(`Using maxResults: ${maxEmails}`);
+
+    // The 'q' parameter filters for unread messages, limited by the user's setting
+    const response = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=${maxEmails}`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -116,7 +120,7 @@ async function fetchUnreadMessageIds(token) {
     // Clear storage on any error to ensure a clean state for the next attempt
     await chrome.storage.session.remove('summariesList');
   } finally {
-    // ALWAYS notify the popup that the process is complete, so it can update its UI.
+    // ALWAYS notify the popup that the process is complete, so it can update its UI
     console.log('Process finished, notifying popup.');
     chrome.runtime.sendMessage({ action: 'summariesUpdated' });
   }
@@ -143,7 +147,7 @@ function getAuthToken() {
   chrome.identity.getAuthToken({ interactive: true }, (token) => {
     if (chrome.runtime.lastError || !token) {
       console.error('getAuthToken error:', chrome.runtime.lastError.message);
-      // If user cancels the auth dialog, notify the popup to stop the loading state.
+      // If user cancels the auth dialog, notify the popup to stop the loading state
       chrome.runtime.sendMessage({ action: 'summariesUpdated' });
       return;
     }

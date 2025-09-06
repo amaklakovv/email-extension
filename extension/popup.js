@@ -5,6 +5,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const loader = document.getElementById('loader');
   const refreshButton = document.getElementById('refresh-button');
   const optionsButton = document.getElementById('options-button');
+  
+  // Options view
+  const mainView = document.getElementById('main-view');
+  const optionsView = document.getElementById('options-view');
+  const backButton = document.getElementById('back-button');
+  const saveButton = document.getElementById('save-button');
+  const maxEmailsInput = document.getElementById('max-emails');
+  const statusDiv = document.getElementById('status');
 
   // UI State Management
 
@@ -73,7 +81,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   optionsButton.addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
+    mainView.style.display = 'none';
+    optionsView.style.display = 'block';
+    restoreOptions();
   });
 
   // Renders a single summary card with its content and copy buttons
@@ -145,6 +155,35 @@ document.addEventListener('DOMContentLoaded', () => {
       updateUI();
     }
   });
+
+  // Options view logic starts here
+  backButton.addEventListener('click', () => {
+    optionsView.style.display = 'none';
+    mainView.style.display = 'block';
+  });
+
+  // Saves options to chrome.storage.sync
+  function saveOptions() {
+    const maxEmails = parseInt(maxEmailsInput.value, 10);
+
+    chrome.storage.sync.set({ maxEmails: maxEmails }, () => {
+      // Update status to let user know options were saved
+      statusDiv.textContent = 'Options saved.';
+      setTimeout(() => {
+        statusDiv.textContent = '';
+      }, 1500);
+    });
+  }
+
+  // Restores settings using the preferences stored in chrome.storage
+  function restoreOptions() {
+    // Use a default value of maxEmails = 5
+    chrome.storage.sync.get({ maxEmails: 5 }, (items) => {
+      maxEmailsInput.value = items.maxEmails;
+    });
+  }
+
+  saveButton.addEventListener('click', saveOptions);
 
   // Initial UI update when the popup is opened
   updateUI();

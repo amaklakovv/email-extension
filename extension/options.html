@@ -13,11 +13,50 @@
     h1 {
       color: #fff;
     }
+    .container {
+      max-width: 600px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    input[type="number"] {
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      width: 80px;
+      background-color: #f0f0f0;
+      color: #282a36;
+    }
+    #save-button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      background-color: #50fa7b;
+      color: #282a36;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 15px;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
-  <h1>Email Summariser Settings</h1>
-  <p>Settings and customizations will be here</p>
+  <div class="container">
+    <h1>Email Summariser Settings</h1>
+    <div class="form-group">
+      <label for="max-emails">Max emails to summarise:</label>
+      <input type="number" id="max-emails" name="max-emails" min="1" max="25">
+    </div>
+    <button id="save-button">Save</button>
+    <div id="status"></div>
+  </div>
   <script src="options.js" defer></script>
 </body>
 </html>
