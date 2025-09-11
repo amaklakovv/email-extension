@@ -6,10 +6,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const refreshButton = document.getElementById('refresh-button');
   const optionsButton = document.getElementById('options-button');
   
-  // Options view
+  // View containers and options elements
   const mainView = document.getElementById('main-view');
   const optionsView = document.getElementById('options-view');
-  const backButton = document.getElementById('back-button');
+  const backButtonHeader = document.getElementById('back-button-header');
   const saveButton = document.getElementById('save-button');
   const maxEmailsInput = document.getElementById('max-emails');
   const statusDiv = document.getElementById('status');
@@ -83,6 +83,9 @@ document.addEventListener('DOMContentLoaded', () => {
   optionsButton.addEventListener('click', () => {
     mainView.style.display = 'none';
     optionsView.style.display = 'block';
+    optionsButton.style.display = 'none';
+    refreshButton.style.display = 'none';
+    backButtonHeader.style.display = 'block';
     restoreOptions();
   });
 
@@ -112,22 +115,38 @@ document.addEventListener('DOMContentLoaded', () => {
     replyContent.textContent = item.reply_draft;
     const copyReplyButton = createCopyButton(item.reply_draft, 'Copy Reply');
 
+    const actionButtonsContainer = document.createElement('div');
+    actionButtonsContainer.className = 'button-group';
+
     const viewOriginalButton = document.createElement('button');
     viewOriginalButton.textContent = 'View Original Email';
     viewOriginalButton.className = 'copy-button';
-    viewOriginalButton.style.marginTop = '10px';
     viewOriginalButton.addEventListener('click', () => {
       const gmailUrl = `https://mail.google.com/mail/u/0/#inbox/${item.messageId}`;
       chrome.tabs.create({ url: gmailUrl });
     });
 
-    contentBody.append(summaryTitle, summaryContent, copySummaryButton, replyTitle, replyContent, copyReplyButton, viewOriginalButton);
+    actionButtonsContainer.append(copyReplyButton, viewOriginalButton);
+    contentBody.append(summaryTitle, summaryContent, copySummaryButton, replyTitle, replyContent, actionButtonsContainer);
 
-    //Click event to toggle visibility
+    // Click event for accordion behavior which happens one at a time
     header.addEventListener('click', () => {
-      header.classList.toggle('active');
-      const isVisible = contentBody.style.display === 'block';
-      contentBody.style.display = isVisible ? 'none' : 'block';
+      const wasActive = header.classList.contains('active');
+
+      // Close all currently active items
+      document.querySelectorAll('.summary-header.active').forEach(activeHeader => {
+        activeHeader.classList.remove('active');
+        const content = activeHeader.nextElementSibling;
+        if (content && content.classList.contains('summary-content-body')) {
+          content.style.maxHeight = null;
+        }
+      });
+
+      // If the clicked item was not already active so open it
+      if (!wasActive) {
+        header.classList.add('active');
+        contentBody.style.maxHeight = contentBody.scrollHeight + 'px';
+      }
     });
 
     container.appendChild(header);
@@ -157,21 +176,27 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Options view logic starts here
-  backButton.addEventListener('click', () => {
+  backButtonHeader.addEventListener('click', () => {
     optionsView.style.display = 'none';
     mainView.style.display = 'block';
+    backButtonHeader.style.display = 'none';
+    optionsButton.style.display = 'block';
+    updateUI();
   });
 
-  // Saves options to chrome.storage.sync
+  // Saves options to chrome.storage.sync and triggers a refresh
   function saveOptions() {
     const maxEmails = parseInt(maxEmailsInput.value, 10);
 
+    saveButton.textContent = 'Saving...';
+
     chrome.storage.sync.set({ maxEmails: maxEmails }, () => {
-      // Update status to let user know options were saved
-      statusDiv.textContent = 'Options saved.';
-      setTimeout(() => {
-        statusDiv.textContent = '';
-      }, 1500);
+      optionsView.style.display = 'none';
+      mainView.style.display = 'block';
+      backButtonHeader.style.display = 'none';
+      optionsButton.style.display = 'block';
+      showLoadingState();
+      chrome.runtime.sendMessage({ action: 'login' });
     });
   }
 
@@ -180,6 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Use a default value of maxEmails = 5
     chrome.storage.sync.get({ maxEmails: 5 }, (items) => {
       maxEmailsInput.value = items.maxEmails;
+      saveButton.textContent = 'Save';
     });
   }
 

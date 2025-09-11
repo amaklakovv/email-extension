@@ -19,6 +19,48 @@ const MOCK_SUMMARIES = [
     sender: 'support@example.com',
     summary: 'A mock summary regarding your recent order. It has been shipped via Express Courier and is expected to arrive in 2-3 business days.',
     reply_draft: 'Thank you for letting me know. I look forward to receiving it.'
+  },
+  {
+    messageId: 'mock789ghi',
+    subject: 'Meeting Reminder',
+    sender: 'team@example.com',
+    summary: 'This is a mock summary for the meeting reminder. The meeting is scheduled for tomorrow at 10 AM to discuss the new marketing strategy.',
+    reply_draft: 'Thanks for the reminder. I will be there.'
+  },
+  {
+    messageId: 'mock101jkl',
+    subject: 'Newsletter - October Edition',
+    sender: 'newsletter@example.com',
+    summary: 'This is a mock summary for the October newsletter. It contains the latest updates and articles from our team.',
+    reply_draft: 'Thank you for the newsletter. I found the articles very informative.'
+  },
+  {
+    messageId: 'mock202mno',
+    subject: 'Invitation to Webinar',
+    sender: 'team@example.com',
+    summary: 'This is a mock summary for the webinar invitation. The webinar will cover the latest trends in the industry and is scheduled for next week.',
+    reply_draft: 'Thank you for the invitation. I would like to attend the webinar.'
+  },
+  {
+    messageId: 'mock303pqr',
+    subject: 'Follow-up on Project X',
+    sender: 'manager@example.com',
+    summary: 'This is a mock summary for the follow-up email on Project X. We need to finalize the requirements by the end of the week.',
+    reply_draft: 'Thanks for the update. I will make sure to have the requirements ready by Friday.'
+  },
+  {
+    messageId: 'mock404stu',
+    subject: 'Your Subscription is Expiring',
+    sender: 'billing@example.com',
+    summary: 'This is a mock summary for the subscription expiration notice. Your subscription will expire in 3 days.',
+    reply_draft: 'Thank you for the reminder. I will renew my subscription soon.'
+  },
+  {
+    messageId: 'mock505vwx',
+    subject: 'Feedback Request',
+    sender: 'customer@example.com',
+    summary: 'This is a mock summary for the feedback request email. The customer is requesting feedback on their recent purchase.',
+    reply_draft: 'Thank you for reaching out. I will provide feedback on my purchase shortly.'
   }
 ];
 
@@ -62,7 +104,8 @@ async function summarizeEmailsWithBackend(emailsData) {
 async function fetchMessageDetails(token, messageId) {
   console.log(`Fetching details for message ID: ${messageId}`);
   const response = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`, {
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: { 'Authorization': `Bearer ${token}` },
+    cache: 'no-cache'
   });
   const message = await response.json();
 
@@ -89,6 +132,7 @@ async function fetchUnreadMessageIds(token) {
 
     // The 'q' parameter filters for unread messages, limited by the user's setting
     const response = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=${maxEmails}`, {
+      cache: 'no-cache',
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -129,12 +173,22 @@ async function fetchUnreadMessageIds(token) {
 // Injects mock data for development purposes bypassing the real API calls
 async function useMockData() {
   console.log('USING MOCK DATA');
-  // Simulate network delay to show the loading spinner in the popup
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  try {
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-  await chrome.storage.session.set({ summariesList: MOCK_SUMMARIES });
-  console.log('Mock summaries stored. Notifying popup.');
-  chrome.runtime.sendMessage({ action: 'summariesUpdated' });
+    // Get user-defined maxResults from storage, with a default of 5
+    const { maxEmails } = await chrome.storage.sync.get({ maxEmails: 5 });
+    console.log(`Using mock data with maxEmails: ${maxEmails}`);
+
+    // Slice the mock data array to respect the user's setting
+    const slicedMockData = MOCK_SUMMARIES.slice(0, maxEmails);
+
+    await chrome.storage.session.set({ summariesList: slicedMockData });
+    console.log('Mock summaries stored. Notifying popup.');
+  } finally {
+    chrome.runtime.sendMessage({ action: 'summariesUpdated' });
+  }
 }
 
 // Initiates the Google OAuth2 flow to get a token

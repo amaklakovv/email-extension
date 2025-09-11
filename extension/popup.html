@@ -30,22 +30,23 @@
       align-items: center;
       gap: 8px;
     }
-    #refresh-button, #options-button {
+    #refresh-button, #options-button, #back-button-header {
       background: none;
       border: none;
       color: #f0f0f0;
       cursor: pointer;
-    }
-    #refresh-button {
-      display: none;
-    }
-    #refresh-button, #options-button {
       font-size: 0.9em;
       padding: 4px 10px;
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 6px;
     }
-    #refresh-button:hover, #options-button:hover {
+    #refresh-button {
+      display: none;
+    }
+    #back-button-header {
+      display: none;
+    }
+    #refresh-button:hover, #options-button:hover, #back-button-header:hover {
       opacity: 0.8;
     }
     #loader {
@@ -116,7 +117,9 @@
     .summary-content-body {
       padding: 0 10px 10px 10px;
       background-color: transparent;
-      display: none;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
     }
     #login-button, .copy-button {
       padding: 8px 12px;
@@ -147,29 +150,46 @@
 
     /* Options view */
     .form-group {
-      margin-bottom: 20px;
+      margin-top: 20px;
     }
     label {
       display: block;
       margin-bottom: 8px;
       font-weight: bold;
     }
-    input[type="number"] {
-      padding: 8px;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-      width: 80px;
-      background-color: #f0f0f0;
-      color: #282a36;
+    .input-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
-    #save-button.copy-button {
-      margin-top: 10px;
-      margin-bottom: 10px;
+    #options-view input[type="number"] {
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background-color: rgba(0, 0, 0, 0.2);
+      color: #f0f0f0;
+      flex-grow: 1;
+      box-sizing: border-box;
+      font-size: 1em;
+    }
+    #save-button {
+      width: auto;
+      flex-shrink: 0;
     }
     #status {
-      margin-top: 15px;
+      margin: 20px 0;
       font-style: italic;
       min-height: 1em;
+      text-align: center;
+    }
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .button-group .copy-button {
+      flex: 1;
+      margin-top: 0;
     }
   </style>
 </head>
@@ -178,6 +198,7 @@
     <h1>Email Summariser</h1>
     <div class="header-actions">
       <button id="refresh-button" title="Refresh Summaries">Refresh</button>
+      <button id="back-button-header" title="Back">Back</button>
       <button id="options-button" title="Settings">Options</button>
     </div>
   </div>
@@ -193,11 +214,12 @@
     <h2>Settings</h2>
     <div class="form-group">
       <label for="max-emails">Max emails to summarise:</label>
-      <input type="number" id="max-emails" name="max-emails" min="1" max="25">
+      <div class="input-group">
+        <input type="number" id="max-emails" name="max-emails" min="1" max="25">
+        <button id="save-button" class="copy-button">Save</button>
+      </div>
     </div>
-    <button id="save-button" class="copy-button">Save</button>
     <div id="status"></div>
-    <button id="back-button" class="copy-button">Back</button>
   </div>
   <script src="popup.js" defer></script>
 </body>
