@@ -24,6 +24,11 @@ A Chrome extension that helps you manage your inbox by automatically summarising
 - Secure handling of API keys
 - Local backend server for data processing
 
+## Next steps
+- Background synch and notifications
+- Deeper Gmail integration (buttons and UI into Gmail webpage)
+- More actions (Read button, Archive button, etc)
+
 ## Acknowledgments
 
 - Google Gmail API
