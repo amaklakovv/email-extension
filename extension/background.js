@@ -3,7 +3,7 @@
 // MOCK DATA FOR DEVELOPMENT
 // Set to `true` to use mock data and bypass Google login and backend calls
 // Set to `false` for production or to test with real data
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 
 const MOCK_SUMMARIES = [
   {
@@ -166,7 +166,11 @@ async function fetchUnreadMessageIds(token) {
   } finally {
     // ALWAYS notify the popup that the process is complete, so it can update its UI
     console.log('Process finished, notifying popup.');
-    chrome.runtime.sendMessage({ action: 'summariesUpdated' });
+    chrome.runtime.sendMessage({ action: 'summariesUpdated' }, () => {
+      if (chrome.runtime.lastError) {
+        console.log('Popup not open. State saved. Update on next open');
+      }
+    });
   }
 }
 
@@ -187,7 +191,11 @@ async function useMockData() {
     await chrome.storage.session.set({ summariesList: slicedMockData });
     console.log('Mock summaries stored. Notifying popup.');
   } finally {
-    chrome.runtime.sendMessage({ action: 'summariesUpdated' });
+    chrome.runtime.sendMessage({ action: 'summariesUpdated' }, () => {
+      if (chrome.runtime.lastError) {
+        console.log('Popup not open. State saved. Update on next open');
+      }
+    });
   }
 }
 
@@ -202,7 +210,11 @@ function getAuthToken() {
     if (chrome.runtime.lastError || !token) {
       console.error('getAuthToken error:', chrome.runtime.lastError.message);
       // If user cancels the auth dialog, notify the popup to stop the loading state
-      chrome.runtime.sendMessage({ action: 'summariesUpdated' });
+      chrome.runtime.sendMessage({ action: 'summariesUpdated' }, () => {
+        if (chrome.runtime.lastError) {
+          console.log('Popup not open when auth failed/cancelled.');
+        }
+      });
       return;
     }
     console.log('Successfully received auth token:', token);
@@ -210,11 +222,42 @@ function getAuthToken() {
   });
 }
 
+// Logout process where it removes token and clears session data
+function handleLogout() {
+  console.log('Handling logout request...');
+  // First, try to get the current auth token so we can remove it
+  chrome.identity.getAuthToken({ interactive: false }, (token) => {
+    if (chrome.runtime.lastError) {
+      // This can happen if the user is already logged out so safe to ignore
+      console.log('No active token found, clearing storage anyway.');
+    }
+
+    if (token) {
+      // Invalidate the token on Google side
+      fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`);
+      // Remove the token from the browser's local cache
+      chrome.identity.removeCachedAuthToken({ token }, () => {
+        console.log('Cached auth token removed.');
+      });
+    }
+
+    // Clear our extension's session storage and notify the popup
+    chrome.storage.session.remove('summariesList', () => {
+      console.log('Session storage cleared. Notifying popup.');
+      chrome.runtime.sendMessage({ action: 'summariesUpdated' }, () => {
+        if (chrome.runtime.lastError) {
+          console.log('Popup not open during logout. State cleared');
+        }
+      });
+    });
+  });
+}
+
 // Listen for messages from other parts of the extension like the popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'login') {
     getAuthToken();
-  }
+  } else if (request.action === 'logout') { handleLogout(); }
   // Return true to indicate you wish to send a response asynchronously
   return true;
 });

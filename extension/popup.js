@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveButton = document.getElementById('save-button');
   const maxEmailsInput = document.getElementById('max-emails');
   const statusDiv = document.getElementById('status');
+  const logoutButton = document.getElementById('logout-button');
 
   // UI State Management
 
@@ -209,8 +210,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  logoutButton.addEventListener('click', () => {
+    logoutButton.textContent = 'Logging out...';
+    chrome.runtime.sendMessage({ action: 'logout' });
+  });
+
   saveButton.addEventListener('click', saveOptions);
 
-  // Initial UI update when the popup is opened
   updateUI();
 });
