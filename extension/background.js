@@ -98,6 +98,10 @@ async function summarizeEmailsWithBackend(emailsData) {
 
   // Store the list of summaries so the popup can access it
   await chrome.storage.session.set({ summariesList: combinedData });
+
+  // Update the badge with the number of summaries
+  const count = combinedData.length;
+  await chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
 }
 
 // Fetches the full content of a single email message and returns its details
@@ -158,6 +162,7 @@ async function fetchUnreadMessageIds(token) {
     } else {
       console.log('No unread emails found.');
       await chrome.storage.session.set({ summariesList: [] }); // Store empty array for popup
+      await chrome.action.setBadgeText({ text: '' }); // Clear badge
     }
   } catch (error) {
     console.error('Error during fetch/summarize process:', error);
@@ -190,6 +195,10 @@ async function useMockData() {
 
     await chrome.storage.session.set({ summariesList: slicedMockData });
     console.log('Mock summaries stored. Notifying popup.');
+
+    // Update badge FOR MOCK DATA
+    const count = slicedMockData.length;
+    await chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
   } finally {
     chrome.runtime.sendMessage({ action: 'summariesUpdated' }, () => {
       if (chrome.runtime.lastError) {
@@ -200,16 +209,21 @@ async function useMockData() {
 }
 
 // Initiates the Google OAuth2 flow to get a token
-function getAuthToken() {
+function getAuthToken(isInteractive) {
   if (USE_MOCK_DATA) {
     useMockData();
     return;
   }
 
-  chrome.identity.getAuthToken({ interactive: true }, (token) => {
+  chrome.identity.getAuthToken({ interactive: isInteractive }, (token) => {
     if (chrome.runtime.lastError || !token) {
-      console.error('getAuthToken error:', chrome.runtime.lastError.message);
-      // If user cancels the auth dialog, notify the popup to stop the loading state
+      // If it's non-interactive stop silently
+      if (!isInteractive) {
+        console.log('Could not get token non-interactively. User may be logged out.');
+        return;
+      }
+      // If interactive it means the user cancelled the dialog
+      console.log('getAuthToken interactive error/rejection:', chrome.runtime.lastError.message);
       chrome.runtime.sendMessage({ action: 'summariesUpdated' }, () => {
         if (chrome.runtime.lastError) {
           console.log('Popup not open when auth failed/cancelled.');
@@ -243,6 +257,7 @@ function handleLogout() {
 
     // Clear our extension's session storage and notify the popup
     chrome.storage.session.remove('summariesList', () => {
+      chrome.action.setBadgeText({ text: '' });
       console.log('Session storage cleared. Notifying popup.');
       chrome.runtime.sendMessage({ action: 'summariesUpdated' }, () => {
         if (chrome.runtime.lastError) {
@@ -253,11 +268,30 @@ function handleLogout() {
   });
 }
 
+// Used when the extension is first installed, updated, or Chrome is updated
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('Extension installed/updated. Setting up alarm.');
+  // 1 minute delay for initial fetch after install/update for better UX
+  // 15 minutes period for subsequent fetches
+  chrome.alarms.create('fetchEmailsAlarm', {
+    delayInMinutes: 1,
+    periodInMinutes: 15
+  });
+  // Set a default badge color
+  chrome.action.setBadgeBackgroundColor({ color: '#F44336' });
+});
+
+// Used when an alarm goes off
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'fetchEmailsAlarm') {
+    console.log('Alarm triggered: fetching emails in the background.');
+    // Fetch non-interactively and it will fail silently if the user is logged out
+    getAuthToken(false);
+  }
+});
+
 // Listen for messages from other parts of the extension like the popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'login') {
-    getAuthToken();
-  } else if (request.action === 'logout') { handleLogout(); }
-  // Return true to indicate you wish to send a response asynchronously
-  return true;
+  if (request.action === 'login') getAuthToken(true);
+  else if (request.action === 'logout') handleLogout();
 });
