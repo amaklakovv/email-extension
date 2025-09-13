@@ -3,7 +3,7 @@
 // MOCK DATA FOR DEVELOPMENT
 // Set to `true` to use mock data and bypass Google login and backend calls
 // Set to `false` for production or to test with real data
-const USE_MOCK_DATA = false;
+const USE_MOCK_DATA = true;
 
 const MOCK_SUMMARIES = [
   {
@@ -73,37 +73,6 @@ function base64UrlDecode(str) {
   return atob(str);
 }
 
-// Sends email data to the backend API for summarisation
-async function summarizeEmailsWithBackend(emailsData) {
-  console.log(`Sending ${emailsData.length} email(s) to backend for summarisation...`);
-  const response = await fetch('http://127.0.0.1:8000/summarize', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(emailsData),
-  });
-
-  if (!response.ok) throw new Error(`Backend responded with ${response.status}: ${await response.text()}`);
-
-  const summaries = await response.json();
-  console.log('SUCCESS: Received summaries from backend:', summaries);
-
-  // Combine original email details with the summaries received from the backend
-  const combinedData = emailsData.map((email, index) => ({
-    messageId: email.messageId,
-    subject: email.subject,
-    sender: email.sender,
-    summary: summaries[index].summary,
-    reply_draft: summaries[index].reply_draft,
-  }));
-
-  // Store the list of summaries so the popup can access it
-  await chrome.storage.session.set({ summariesList: combinedData });
-
-  // Update the badge with the number of summaries
-  const count = combinedData.length;
-  await chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
-}
-
 // Fetches the full content of a single email message and returns its details
 async function fetchMessageDetails(token, messageId) {
   console.log(`Fetching details for message ID: ${messageId}`);
@@ -158,7 +127,7 @@ async function fetchUnreadMessageIds(token) {
     if (data.messages && data.messages.length > 0) {
       const detailPromises = data.messages.map(message => fetchMessageDetails(token, message.id));
       const emailDetails = await Promise.all(detailPromises);
-      await summarizeEmailsWithBackend(emailDetails);
+      await summarizeEmailsWithBackend(emailDetails, true);
     } else {
       console.log('No unread emails found.');
       await chrome.storage.session.set({ summariesList: [] }); // Store empty array for popup
@@ -209,7 +178,7 @@ async function useMockData() {
 }
 
 // Initiates the Google OAuth2 flow to get a token
-function getAuthToken(isInteractive) {
+function getAuthToken(isInteractive, callback) {
   if (USE_MOCK_DATA) {
     useMockData();
     return;
@@ -220,6 +189,10 @@ function getAuthToken(isInteractive) {
       // If it's non-interactive stop silently
       if (!isInteractive) {
         console.log('Could not get token non-interactively. User may be logged out.');
+        // If a callback was provided, call it with no token
+        if (callback) {
+          callback(null);
+        }
         return;
       }
       // If interactive it means the user cancelled the dialog
@@ -232,7 +205,12 @@ function getAuthToken(isInteractive) {
       return;
     }
     console.log('Successfully received auth token:', token);
-    fetchUnreadMessageIds(token);
+    // If a callback is provided, use it. Otherwise, do the default action.
+    if (callback) {
+      callback(token);
+    } else {
+      fetchUnreadMessageIds(token);
+    }
   });
 }
 
@@ -290,8 +268,69 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
+// Handles a request from a content script to summarize a single email
+async function handleSummarizeSingleEmail(messageId, tabId) {
+  console.log(`Content script requested summary for messageId: ${messageId}`);
+  getAuthToken(false, async (token) => {
+    if (!token) {
+      console.error('Cannot summarize single email, no auth token.');
+      // Optional to send an error message back to the content script
+      chrome.tabs.sendMessage(tabId, { action: 'error', message: 'Could not authenticate. Please log in via the extension popup.' });
+      return;
+    }
+    try {
+      const emailDetails = await fetchMessageDetails(token, messageId, false);
+      const summaries = await summarizeEmailsWithBackend([emailDetails], false);
+      // Send single result back to the content script
+      chrome.tabs.sendMessage(tabId, { action: 'showSummary', data: summaries[0] });
+    } catch (error) {
+      console.error('Error summarizing single email:', error);
+      chrome.tabs.sendMessage(tabId, { action: 'error', message: 'Failed to generate summary.' });
+    }
+  });
+}
+
 // Listen for messages from other parts of the extension like the popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'login') getAuthToken(true);
   else if (request.action === 'logout') handleLogout();
+  else if (request.action === 'summarizeSingleEmail') {
+    // Request from content script sender.tab.id tells us which tab to reply to
+    handleSummarizeSingleEmail(request.messageId, sender.tab.id);
+    return true;
+  }
 });
+
+async function summarizeEmailsWithBackend(emailsData, storeInSession = true) {
+  console.log(`Sending ${emailsData.length} email(s) to backend for summarisation...`);
+  const response = await fetch('http://127.0.0.1:8000/summarize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(emailsData),
+  });
+
+  if (!response.ok) throw new Error(`Backend responded with ${response.status}: ${await response.text()}`);
+
+  const summaries = await response.json();
+  console.log('SUCCESS: Received summaries from backend:', summaries);
+
+  // Combine original email details with the summaries received from the backend
+  const combinedData = emailsData.map((email, index) => ({
+    messageId: email.messageId,
+    subject: email.subject,
+    sender: email.sender,
+    summary: summaries[index].summary,
+    reply_draft: summaries[index].reply_draft,
+  }));
+
+  if (storeInSession) {
+    // Store the list of summaries so the popup can access it
+    await chrome.storage.session.set({ summariesList: combinedData });
+
+    // Update the badge with the number of summaries
+    const count = combinedData.length;
+    await chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
+  }
+
+  return combinedData;
+}
