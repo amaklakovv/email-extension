@@ -143,37 +143,33 @@ function getAuthToken(isInteractive, callback) {
 }
 
 // Logout process where it removes token and clears session data
-function handleLogout() {
+async function handleLogout() {
   console.log('Handling logout request...');
-  // First, try to get the current auth token so we can remove it
-  chrome.identity.getAuthToken({ interactive: false }, (token) => {
-    if (chrome.runtime.lastError) {
-      // This can happen if the user is already logged out so safe to ignore
-      console.log('No active token found, clearing storage anyway.');
-    }
+  try {
+    const token = await new Promise((resolve) => {
+      chrome.identity.getAuthToken({ interactive: false }, (token) => resolve(token));
+    });
 
     if (token) {
-      // Invalidate the token on Google side
-      fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`);
-      // Remove the token from the browser's local cache
-      chrome.identity.removeCachedAuthToken({ token }, () => {
-        console.log('Cached auth token removed.');
-      });
+      await fetch(`https://accounts.google.com/o/oauth2/revoke?token=${token}`);
+      await new Promise(resolve => chrome.identity.removeCachedAuthToken({ token }, resolve));
+      console.log('Cached auth token removed.');
     }
 
-    // Clear our extension's session storage and notify the popup
-    chrome.storage.session.remove('summariesList', async () => {
-      // Also clear the persistent list of summarized IDs
-      await chrome.storage.local.remove('summarizedMessageIds');
-      await chrome.action.setBadgeText({ text: '' });
-      console.log('Session and local storage cleared. Notifying popup.');
-      chrome.runtime.sendMessage({ action: 'summariesUpdated' }, () => {
-        if (chrome.runtime.lastError) {
-          console.log('Popup not open during logout. State cleared.');
-        }
-      });
+    await chrome.storage.session.remove('summariesList');
+    await chrome.storage.local.remove('summarizedMessageIds');
+    await chrome.action.setBadgeText({ text: '' });
+    console.log('Session and local storage cleared.');
+  } catch (error) {
+    console.error('Error during logout:', error);
+  } finally {
+    // Always notify the popup to update its UI
+    chrome.runtime.sendMessage({ action: 'summariesUpdated' }, () => {
+      if (chrome.runtime.lastError) {
+        console.log('Popup not open during logout. State cleared.');
+      }
     });
-  });
+  }
 }
 
 // Used when the extension is first installed, updated, or Chrome is updated
@@ -185,7 +181,6 @@ chrome.runtime.onInstalled.addListener(() => {
     delayInMinutes: 1,
     periodInMinutes: 15
   });
-  // Set a default badge color
   chrome.action.setBadgeBackgroundColor({ color: '#F44336' });
 });
 
@@ -198,58 +193,42 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// Handles a request from a content script to summarize a single email
-async function handleSummarizeSingleEmail(messageId, tabId) {
-  console.log(`Content script requested summary for messageId: ${messageId}`);
-
-  // If using mock data, simulate the process and return a mock summary.
-  if (USE_MOCK_DATA) {
-    console.log('HANDLING SINGLE EMAIL WITH MOCK DATA');
-    try {
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Pick a random mock summary to show
-      const mockSummary = MOCK_SUMMARIES[Math.floor(Math.random() * MOCK_SUMMARIES.length)];
-
-      // Make the mock data act like it corresponds to the requested messageId
-      const responseData = { ...mockSummary, messageId: messageId, subject: 'Mocked: ' + mockSummary.subject };
-
-      chrome.tabs.sendMessage(tabId, { action: 'showSummary', data: responseData });
-    } catch (error) {
-      console.error('Error in mock handleSummarizeSingleEmail:', error);
-      chrome.tabs.sendMessage(tabId, { action: 'error', message: 'Failed to generate mock summary.' });
-    }
-    return;
-  }
-
-  getAuthToken(false, async (token) => {
-    if (!token) {
-      console.error('Cannot summarize single email, no auth token.');
-      // Optional to send an error message back to the content script
-      chrome.tabs.sendMessage(tabId, { action: 'error', message: 'Could not authenticate. Please log in via the extension popup.' });
-      return;
-    }
-    try {
-      const emailDetails = await fetchMessageDetails(token, messageId, false);
-      const summaries = await summarizeEmailsWithBackend([emailDetails]);
-      // Send single result back to the content script
-      chrome.tabs.sendMessage(tabId, { action: 'showSummary', data: summaries[0] });
-    } catch (error) {
-      console.error('Error summarizing single email:', error);
-      chrome.tabs.sendMessage(tabId, { action: 'error', message: 'Failed to generate summary.' });
-    }
-  });
-}
-
 // Listen for messages from other parts of the extension like the popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'login') getAuthToken(true);
-  else if (request.action === 'logout') handleLogout();
-  else if (request.action === 'summarizeSingleEmail') {
-    // Request from content script sender.tab.id tells us which tab to reply to
-    handleSummarizeSingleEmail(request.messageId, sender.tab.id);
-    return true;
+  if (request.action === 'login') {
+    getAuthToken(true);
+  } else if (request.action === 'logout') {
+    handleLogout();
+  } else if (request.action === 'summarizeSingleEmail') {
+    const { messageId } = request;
+    const tabId = sender.tab.id;
+    console.log(`Content script requested summary for messageId: ${messageId}`);
+
+      // So I can test without using my api key
+      if (USE_MOCK_DATA) {
+        console.log('HANDLING SINGLE EMAIL WITH MOCK DATA');
+        setTimeout(() => {
+            const mockSummary = MOCK_SUMMARIES[Math.floor(Math.random() * MOCK_SUMMARIES.length)];
+            const responseData = { ...mockSummary, messageId, subject: 'Mocked: ' + mockSummary.subject };
+            chrome.tabs.sendMessage(tabId, { action: 'showSummary', data: responseData });
+        }, 1500);
+      } else {
+        getAuthToken(false, async (token) => {
+          if (!token) {
+            chrome.tabs.sendMessage(tabId, { action: 'error', message: 'Could not authenticate. Please log in via the extension popup.' });
+            return;
+          }
+          try {
+            const emailDetails = await fetchMessageDetails(token, messageId);
+            const summaries = await summarizeEmailsWithBackend([emailDetails]);
+            chrome.tabs.sendMessage(tabId, { action: 'showSummary', data: summaries[0] });
+          } catch (error) {
+            console.error('Error summarizing single email:', error);
+            chrome.tabs.sendMessage(tabId, { action: 'error', message: 'Failed to generate summary.' });
+          }
+        });
+      }
+      return true; // Indicate that we will respond asynchronously.
   }
 });
 

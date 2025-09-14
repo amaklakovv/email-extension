@@ -36,7 +36,7 @@ function injectFab() {
       // Add both 'visible' and 'loading' classes to show the small loading box
       summaryContainer.classList.add('visible', 'loading');
 
-      chrome.runtime.sendMessage({ action: 'summariseSingleEmail', messageId: messageId });
+      chrome.runtime.sendMessage({ action: 'summarizeSingleEmail', messageId: messageId });
     } else {
       console.error('Could not find message ID.');
       alert('Could not identify the email to summarise.');
