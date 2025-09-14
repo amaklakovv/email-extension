@@ -1,70 +1,9 @@
-// This file is the extension's service worker and it runs in the background and handles events and long-running tasks
+import { MOCK_SUMMARIES, useMockData } from './mockdata.js';
 
 // MOCK DATA FOR DEVELOPMENT
 // Set to `true` to use mock data and bypass Google login and backend calls
 // Set to `false` for production or to test with real data
 const USE_MOCK_DATA = true;
-
-const MOCK_SUMMARIES = [
-  {
-    messageId: 'mock123abc',
-    subject: 'Mock Email: Project Update',
-    sender: 'team@example.com',
-    summary: 'This is a mock summary for the project update. We are on track to meet the Q3 deadline. All major components are integrated and passing initial tests.',
-    reply_draft: 'Thanks for the update! Glad to hear we are on track. Let me know if the design team can help with anything.'
-  },
-  {
-    messageId: 'mock456def',
-    subject: 'Re: Your recent order',
-    sender: 'support@example.com',
-    summary: 'A mock summary regarding your recent order. It has been shipped via Express Courier and is expected to arrive in 2-3 business days.',
-    reply_draft: 'Thank you for letting me know. I look forward to receiving it.'
-  },
-  {
-    messageId: 'mock789ghi',
-    subject: 'Meeting Reminder',
-    sender: 'team@example.com',
-    summary: 'This is a mock summary for the meeting reminder. The meeting is scheduled for tomorrow at 10 AM to discuss the new marketing strategy.',
-    reply_draft: 'Thanks for the reminder. I will be there.'
-  },
-  {
-    messageId: 'mock101jkl',
-    subject: 'Newsletter - October Edition',
-    sender: 'newsletter@example.com',
-    summary: 'This is a mock summary for the October newsletter. It contains the latest updates and articles from our team.',
-    reply_draft: 'Thank you for the newsletter. I found the articles very informative.'
-  },
-  {
-    messageId: 'mock202mno',
-    subject: 'Invitation to Webinar',
-    sender: 'team@example.com',
-    summary: 'This is a mock summary for the webinar invitation. The webinar will cover the latest trends in the industry and is scheduled for next week.',
-    reply_draft: 'Thank you for the invitation. I would like to attend the webinar.'
-  },
-  {
-    messageId: 'mock303pqr',
-    subject: 'Follow-up on Project X',
-    sender: 'manager@example.com',
-    summary: 'This is a mock summary for the follow-up email on Project X. We need to finalize the requirements by the end of the week.',
-    reply_draft: 'Thanks for the update. I will make sure to have the requirements ready by Friday.'
-  },
-  {
-    messageId: 'mock404stu',
-    subject: 'Your Subscription is Expiring',
-    sender: 'billing@example.com',
-    summary: 'This is a mock summary for the subscription expiration notice. Your subscription will expire in 3 days.',
-    reply_draft: 'Thank you for the reminder. I will renew my subscription soon.'
-  },
-  {
-    messageId: 'mock505vwx',
-    subject: 'Feedback Request',
-    sender: 'customer@example.com',
-    summary: 'This is a mock summary for the feedback request email. The customer is requesting feedback on their recent purchase.',
-    reply_draft: 'Thank you for reaching out. I will provide feedback on my purchase shortly.'
-  }
-];
-
-// END MOCK DATA
 
 // Decodes a Base64-encoded string that is safe for URLs
 // Gmail API returns body content in this format
@@ -100,6 +39,9 @@ async function fetchUnreadMessageIds(token) {
   console.log('Fetching unread emails...');
   try {
     // Get user-defined maxResults from storage, with a default of 5
+    const { summarizedMessageIds = [] } = await chrome.storage.local.get('summarizedMessageIds');
+    const { summariesList: oldSummaries = [] } = await chrome.storage.session.get('summariesList');
+
     const { maxEmails } = await chrome.storage.sync.get({ maxEmails: 5 });
     console.log(`Using maxResults: ${maxEmails}`);
 
@@ -124,14 +66,29 @@ async function fetchUnreadMessageIds(token) {
     const data = await response.json();
     console.log('API response for message IDs:', data);
 
-    if (data.messages && data.messages.length > 0) {
-      const detailPromises = data.messages.map(message => fetchMessageDetails(token, message.id));
+    const allUnreadMessages = data.messages || [];
+    // Filter out messages that have already been summarized
+    const newMessagesToProcess = allUnreadMessages.filter(msg => !summarizedMessageIds.includes(msg.id));
+
+    if (newMessagesToProcess.length > 0) {
+      console.log(`Found ${newMessagesToProcess.length} new unread emails to summarize.`);
+      const detailPromises = newMessagesToProcess.map(message => fetchMessageDetails(token, message.id));
       const emailDetails = await Promise.all(detailPromises);
-      await summarizeEmailsWithBackend(emailDetails, true);
+      const newSummaries = await summarizeEmailsWithBackend(emailDetails);
+
+      // Combine new summaries with existing ones and update storage
+      const allSummaries = [...newSummaries, ...oldSummaries];
+      const newSummarizedIds = [...summarizedMessageIds, ...newSummaries.map(s => s.messageId)];
+
+      await chrome.storage.session.set({ summariesList: allSummaries });
+      await chrome.storage.local.set({ summarizedMessageIds: newSummarizedIds });
+      await chrome.action.setBadgeText({ text: allSummaries.length > 0 ? String(allSummaries.length) : '' });
+
     } else {
-      console.log('No unread emails found.');
-      await chrome.storage.session.set({ summariesList: [] }); // Store empty array for popup
-      await chrome.action.setBadgeText({ text: '' }); // Clear badge
+      console.log('No new unread emails found.');
+      // If there are no new messages, ensure the session is still set correctly
+      // in case it was cleared, but don't overwrite if it has data.
+      if (!oldSummaries.length) await chrome.storage.session.set({ summariesList: [] });
     }
   } catch (error) {
     console.error('Error during fetch/summarize process:', error);
@@ -140,35 +97,6 @@ async function fetchUnreadMessageIds(token) {
   } finally {
     // ALWAYS notify the popup that the process is complete, so it can update its UI
     console.log('Process finished, notifying popup.');
-    chrome.runtime.sendMessage({ action: 'summariesUpdated' }, () => {
-      if (chrome.runtime.lastError) {
-        console.log('Popup not open. State saved. Update on next open');
-      }
-    });
-  }
-}
-
-// Injects mock data for development purposes bypassing the real API calls
-async function useMockData() {
-  console.log('USING MOCK DATA');
-  try {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Get user-defined maxResults from storage, with a default of 5
-    const { maxEmails } = await chrome.storage.sync.get({ maxEmails: 5 });
-    console.log(`Using mock data with maxEmails: ${maxEmails}`);
-
-    // Slice the mock data array to respect the user's setting
-    const slicedMockData = MOCK_SUMMARIES.slice(0, maxEmails);
-
-    await chrome.storage.session.set({ summariesList: slicedMockData });
-    console.log('Mock summaries stored. Notifying popup.');
-
-    // Update badge FOR MOCK DATA
-    const count = slicedMockData.length;
-    await chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
-  } finally {
     chrome.runtime.sendMessage({ action: 'summariesUpdated' }, () => {
       if (chrome.runtime.lastError) {
         console.log('Popup not open. State saved. Update on next open');
@@ -234,12 +162,14 @@ function handleLogout() {
     }
 
     // Clear our extension's session storage and notify the popup
-    chrome.storage.session.remove('summariesList', () => {
-      chrome.action.setBadgeText({ text: '' });
-      console.log('Session storage cleared. Notifying popup.');
+    chrome.storage.session.remove('summariesList', async () => {
+      // Also clear the persistent list of summarized IDs
+      await chrome.storage.local.remove('summarizedMessageIds');
+      await chrome.action.setBadgeText({ text: '' });
+      console.log('Session and local storage cleared. Notifying popup.');
       chrome.runtime.sendMessage({ action: 'summariesUpdated' }, () => {
         if (chrome.runtime.lastError) {
-          console.log('Popup not open during logout. State cleared');
+          console.log('Popup not open during logout. State cleared.');
         }
       });
     });
@@ -271,6 +201,28 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // Handles a request from a content script to summarize a single email
 async function handleSummarizeSingleEmail(messageId, tabId) {
   console.log(`Content script requested summary for messageId: ${messageId}`);
+
+  // If using mock data, simulate the process and return a mock summary.
+  if (USE_MOCK_DATA) {
+    console.log('HANDLING SINGLE EMAIL WITH MOCK DATA');
+    try {
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Pick a random mock summary to show
+      const mockSummary = MOCK_SUMMARIES[Math.floor(Math.random() * MOCK_SUMMARIES.length)];
+
+      // Make the mock data act like it corresponds to the requested messageId
+      const responseData = { ...mockSummary, messageId: messageId, subject: 'Mocked: ' + mockSummary.subject };
+
+      chrome.tabs.sendMessage(tabId, { action: 'showSummary', data: responseData });
+    } catch (error) {
+      console.error('Error in mock handleSummarizeSingleEmail:', error);
+      chrome.tabs.sendMessage(tabId, { action: 'error', message: 'Failed to generate mock summary.' });
+    }
+    return;
+  }
+
   getAuthToken(false, async (token) => {
     if (!token) {
       console.error('Cannot summarize single email, no auth token.');
@@ -280,7 +232,7 @@ async function handleSummarizeSingleEmail(messageId, tabId) {
     }
     try {
       const emailDetails = await fetchMessageDetails(token, messageId, false);
-      const summaries = await summarizeEmailsWithBackend([emailDetails], false);
+      const summaries = await summarizeEmailsWithBackend([emailDetails]);
       // Send single result back to the content script
       chrome.tabs.sendMessage(tabId, { action: 'showSummary', data: summaries[0] });
     } catch (error) {
@@ -301,7 +253,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-async function summarizeEmailsWithBackend(emailsData, storeInSession = true) {
+async function summarizeEmailsWithBackend(emailsData) {
   console.log(`Sending ${emailsData.length} email(s) to backend for summarisation...`);
   const response = await fetch('http://127.0.0.1:8000/summarize', {
     method: 'POST',
@@ -322,15 +274,6 @@ async function summarizeEmailsWithBackend(emailsData, storeInSession = true) {
     summary: summaries[index].summary,
     reply_draft: summaries[index].reply_draft,
   }));
-
-  if (storeInSession) {
-    // Store the list of summaries so the popup can access it
-    await chrome.storage.session.set({ summariesList: combinedData });
-
-    // Update the badge with the number of summaries
-    const count = combinedData.length;
-    await chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
-  }
 
   return combinedData;
 }

@@ -21,83 +21,107 @@ function injectFab() {
   fab.title = 'Summarize this email';
   fab.textContent = 'Summarise';
 
+  const summaryContainer = document.createElement('div');
+  summaryContainer.id = 'inline-summary-container';
+  summaryContainer.className = 'inline-summary-container';
+
   fab.onclick = (e) => {
     e.stopPropagation();
     const messageId = getMessageId();
     if (messageId) {
       console.log('Summarize button clicked for message ID:', messageId);
-      fab.disabled = true;
-      // Placeholder loading state
-      fab.textContent = '...';
-      chrome.runtime.sendMessage({ action: 'summarizeSingleEmail', messageId: messageId });
+      
+      fab.classList.remove('visible');
+      summaryContainer.innerHTML = '<p class="summary-loading-text">Summarising...</p>';
+      // Add both 'visible' and 'loading' classes to show the small loading box
+      summaryContainer.classList.add('visible', 'loading');
+
+      chrome.runtime.sendMessage({ action: 'summariseSingleEmail', messageId: messageId });
     } else {
       console.error('Could not find message ID.');
-      alert('Could not identify the email to summarize.');
+      alert('Could not identify the email to summarise.');
     }
   };
 
   document.body.appendChild(fab);
+  document.body.appendChild(summaryContainer);
 }
 
-function showSummaryOverlay(data) {
-  document.querySelector('.summary-overlay')?.remove();
+// Helper to create the copy to clipboard button taken from popup.js
+function createCopyButton(textToCopy, label = 'Copy') {
+  const button = document.createElement('button');
+  button.textContent = label;
+  button.className = 'copy-button';
+  button.addEventListener('click', (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(textToCopy);
+    button.textContent = 'Copied!';
+    setTimeout(() => (button.textContent = label), 1500);
+  });
+  return button;
+}
 
-  const overlay = document.createElement('div');
-  overlay.className = 'summary-overlay';
+function renderInlineSummary(container, data) {
+  const fab = document.getElementById('summarize-fab');
 
-  overlay.innerHTML = `
-    <div class="summary-card">
-      <button class="summary-card-close">&times;</button>
-      <h2>Summary of: ${data.subject}</h2>
-      <p>${data.summary}</p>
-      <hr>
-      <h2>Suggested Reply:</h2>
-      <p>${data.reply_draft}</p>
-    </div>
+  // Build the inner content of the summary card
+  container.innerHTML = `
+    <button class="inline-summary-close-btn">&times;</button>
+    <h2>Summary: ${data.subject}</h2>
+    <p>${data.summary}</p>
+    <h2>Suggested Reply</h2>
+    <p>${data.reply_draft}</p>
   `;
 
-  document.body.appendChild(overlay);
+  // Create and append buttons with event listeners
+  const copySummaryBtn = createCopyButton(data.summary, 'Copy Summary');
+  const copyReplyBtn = createCopyButton(data.reply_draft, 'Copy Reply');
+  container.appendChild(copySummaryBtn);
+  container.appendChild(copyReplyBtn);
 
-  // Close overlay when clicking the close button or outside the card
-  overlay.querySelector('.summary-card-close').onclick = () => overlay.remove();
-  overlay.onclick = (e) => {
-    if (e.target === overlay) {
-      overlay.remove();
+  container.classList.remove('loading');
+
+  // Add event listener for the new close button
+  container.querySelector('.inline-summary-close-btn').onclick = () => {
+    container.classList.remove('visible');
+    
+    // Showing button if email is still open
+    if (!!document.querySelector('[data-legacy-message-id]')) {
+      fab.classList.add('visible');
     }
   };
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  const summaryContainer = document.getElementById('inline-summary-container');
+  const fab = document.getElementById('summarize-fab');
+
   if (request.action === 'showSummary') {
-    showSummaryOverlay(request.data);
+    renderInlineSummary(summaryContainer, request.data);
   } else if (request.action === 'error') {
     alert(`Error: ${request.message}`);
-  }
-
-  // Always reset the floating button state after a response
-  const fab = document.getElementById('summarize-fab');
-  if (fab) {
-    fab.disabled = false;
-    fab.textContent = 'Summarise';
+    summaryContainer.classList.remove('visible', 'loading');
+    if (fab) fab.classList.add('visible');
   }
 });
 
-// Inject floating button on initial load, it will be hidden by default
 injectFab();
 
 const observer = new MutationObserver((mutations) => {
   const fab = document.getElementById('summarize-fab');
-  if (!fab) return;
+  const summaryContainer = document.getElementById('inline-summary-container');
+  if (!fab || !summaryContainer) return;
 
   // Most reliable indicator of an open email is the presence of this element
   const isEmailOpen = !!document.querySelector('[data-legacy-message-id]');
 
   if (isEmailOpen) {
-    // Show the button if an email is open
-    fab.classList.add('visible');
+    if (!summaryContainer.classList.contains('visible')) {
+      fab.classList.add('visible');
+    }
   } else {
-    // Hide button if no email is open
     fab.classList.remove('visible');
+    summaryContainer.classList.remove('visible');
   }
 });
 

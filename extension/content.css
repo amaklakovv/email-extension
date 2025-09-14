@@ -52,6 +52,98 @@
   transform: scale(1.05);
 }
 
+.inline-summary-container {
+  position: fixed;
+  bottom: 80px;
+  right: 80px;
+  width: 350px;
+  max-height: 70vh;
+  overflow-y: auto;
+  
+  background: rgba(40, 42, 54, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  
+  color: #f0f0f0;
+  z-index: 9998;
+  
+  transition: transform 0.2s ease-in-out, opacity 0.3s, width 0.3s ease-out, max-height 0.3s ease-out, padding 0.3s ease-out;
+  transform: scale(0.95);
+  transform-origin: bottom right;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.inline-summary-container.visible {
+  transform: scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* New loading state: constrains the container to the size of the button */
+.inline-summary-container.loading {
+  width: auto; /* Let the text content define the width */
+  max-height: 40px; /* Approximate height of the original button */
+  padding: 10px 16px; /* Match the button's padding */
+  overflow: hidden; /* Prevent content from spilling during animation */
+}
+
+/* Adjust loading text style for the smaller container */
+.inline-summary-container.loading .summary-loading-text {
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  font-style: normal;
+  white-space: nowrap; /* Keep "Summarising..." on one line */
+}
+
+.inline-summary-container h2 {
+  font-size: 16px;
+  margin-top: 0;
+  margin-bottom: 8px;
+  color: #f8f8f2;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 8px;
+}
+
+.inline-summary-container p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #dcdcdc;
+  margin-bottom: 16px;
+}
+
+.inline-summary-container .summary-loading-text {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px;
+  font-style: italic;
+  color: #dcdcdc;
+}
+
+.inline-summary-close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.inline-summary-close-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
 .summary-overlay {
   position: fixed;
   top: 0;
