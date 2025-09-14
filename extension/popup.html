@@ -2,202 +2,8 @@
 <html>
 <head>
   <title>Email Summariser</title>
-  <style>
-    body {
-      width: 350px;
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
-      padding: 15px;
-      background: #282a36;
-      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      color: #f0f0f0;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-    }
-    .header-container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-    }
-    h1 {
-      font-size: 1.4em;
-      color: #fff;
-      margin: 0;
-    }
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    #refresh-button, #options-button, #back-button-header {
-      background: none;
-      border: none;
-      color: #f0f0f0;
-      cursor: pointer;
-      font-size: 0.9em;
-      padding: 4px 10px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 6px;
-    }
-    #refresh-button {
-      display: none;
-    }
-    #back-button-header {
-      display: none;
-    }
-    #refresh-button:hover, #options-button:hover, #back-button-header:hover {
-      opacity: 0.8;
-    }
-    #loader {
-      border: 4px solid rgba(255, 255, 255, 0.2);
-      border-left-color: #fff;
-      border-radius: 50%;
-      width: 30px;
-      height: 30px;
-      animation: spin 1s linear infinite;
-      margin: 20px auto;
-      display: none;
-    }
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-    #summary-container {
-      margin-top: 10px;
-    }
-    .summary-item {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      padding-bottom: 10px;
-      margin-bottom: 10px;
-    }
-    .summary-item:last-child {
-      border-bottom: none;
-      margin-bottom: 0;
-      padding-bottom: 0;
-    }
-    h2 {
-      font-size: 1em;
-      color: #fff;
-      margin-top: 10px;
-      margin-bottom: 5px;
-    }
-    p {
-      font-size: 0.9em;
-      color: #e0e0e0;
-      line-height: 1.4;
-    }
-    .summary-header {
-      background-color: transparent;
-      cursor: pointer;
-      padding: 10px 5px;
-      width: 100%;
-      border: none;
-      text-align: left;
-      outline: none;
-      font-size: 0.9em;
-      transition: background-color 0.3s ease;
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      color: #fff;
-    }
-    .summary-header:hover, .summary-header.active {
-      background-color: rgba(255, 255, 255, 0.1);
-    }
-    .summary-title {
-      font-weight: bold;
-    }
-    .summary-sender {
-      font-size: 0.8em;
-      color: #ccc;
-      margin-top: 4px;
-    }
-    .summary-content-body {
-      padding: 0 10px 10px 10px;
-      background-color: transparent;
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.3s ease-out;
-    }
-    #login-button, .copy-button {
-      padding: 8px 12px;
-      font-size: 0.8em;
-      cursor: pointer;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      background-color: rgba(255, 255, 255, 0.1);
-      color: #f0f0f0;
-      transition: background-color 0.3s ease, transform 0.1s ease;
-      width: 100%;
-      text-align: center;
-    }
-    #login-button:hover, .copy-button:hover {
-      background-color: rgba(255, 255, 255, 0.2);
-    }
-    #login-button:active, .copy-button:active {
-      transform: scale(0.98);
-    }
-    .copy-button {
-      margin-top: 5px;
-    }
-    #status-message {
-      text-align: center;
-      padding: 20px;
-      font-size: 0.9em;
-    }
-
-    /* Options view */
-    .form-group {
-      margin-top: 20px;
-    }
-    label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: bold;
-    }
-    .input-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    #options-view input[type="number"] {
-      padding: 8px;
-      border-radius: 6px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background-color: rgba(0, 0, 0, 0.2);
-      color: #f0f0f0;
-      flex-grow: 1;
-      box-sizing: border-box;
-      font-size: 1em;
-    }
-    #save-button {
-      width: auto;
-      flex-shrink: 0;
-    }
-    #status {
-      margin: 20px 0;
-      font-style: italic;
-      min-height: 1em;
-      text-align: center;
-    }
-    #logout-button {
-      background-color: rgba(255, 82, 82, 0.2);
-      border-color: rgba(255, 82, 82, 0.4);
-      margin-top: 10px;
-      width: 100%;
-    }
-    .button-group {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .button-group .copy-button {
-      flex: 1;
-      margin-top: 0;
-    }
-  </style>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="shared.css">
 </head>
 <body>
   <div class="header-container">
@@ -211,7 +17,7 @@
 
   <div id="main-view">
     <div id="loader"></div>
-    <button id="login-button">Login with Google</button>
+    <button id="login-button" class="copy-button">Login with Google</button>
     <div id="summaries-container"></div>
     <div id="status-message"></div>
   </div>
@@ -222,7 +28,7 @@
       <label for="max-emails">Max emails to summarise:</label>
       <div class="input-group">
         <input type="number" id="max-emails" name="max-emails" min="1" max="25">
-        <button id="save-button" class="copy-button">Save</button>
+        <button id="save-button" class="copy-button" style="width: auto; flex-shrink: 0;">Save</button>
       </div>
     </div>
     <div id="status"></div>

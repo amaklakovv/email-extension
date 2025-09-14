@@ -146,8 +146,11 @@ function getAuthToken(isInteractive, callback) {
 async function handleLogout() {
   console.log('Handling logout request...');
   try {
-    const token = await new Promise((resolve) => {
-      chrome.identity.getAuthToken({ interactive: false }, (token) => resolve(token));
+    const token = await new Promise((resolve, reject) => {
+      chrome.identity.getAuthToken({ interactive: false }, (token) => {
+        if (chrome.runtime.lastError) { resolve(null); } 
+        else { resolve(token); }
+      });
     });
 
     if (token) {
@@ -228,7 +231,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
         });
       }
-      return true; // Indicate that we will respond asynchronously.
+      return true;
   }
 });
 

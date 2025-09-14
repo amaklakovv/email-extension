@@ -102,22 +102,6 @@
   white-space: nowrap; /* Keep "Summarising..." on one line */
 }
 
-.inline-summary-container h2 {
-  font-size: 16px;
-  margin-top: 0;
-  margin-bottom: 8px;
-  color: #f8f8f2;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  padding-bottom: 8px;
-}
-
-.inline-summary-container p {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #dcdcdc;
-  margin-bottom: 16px;
-}
-
 .inline-summary-container .summary-loading-text {
   display: flex;
   justify-content: center;
@@ -130,18 +114,19 @@
 .inline-summary-close-btn {
   position: absolute;
   top: 8px;
-  right: 8px;
+  right: 12px;
   background: none;
-  border: none;
-  font-size: 24px;
-  font-weight: bold;
-  color: rgba(255, 255, 255, 0.5);
+  color: #f0f0f0;
   cursor: pointer;
-  transition: color 0.2s;
+  font-size: 0.9em;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  transition: opacity 0.2s;
 }
 
 .inline-summary-close-btn:hover {
-  color: rgba(255, 255, 255, 0.9);
+  opacity: 0.8;
 }
 
 .summary-overlay {

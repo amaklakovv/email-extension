@@ -64,28 +64,49 @@ function createCopyButton(textToCopy, label = 'Copy') {
 function renderInlineSummary(container, data) {
   const fab = document.getElementById('summarize-fab');
 
-  // Build the inner content of the summary card
-  container.innerHTML = `
-    <button class="inline-summary-close-btn">&times;</button>
-    <h2>Summary: ${data.subject}</h2>
-    <p>${data.summary}</p>
-    <h2>Suggested Reply</h2>
-    <p>${data.reply_draft}</p>
-  `;
+  // Clear the "Summarising..." text
+  container.innerHTML = '';
 
-  // Create and append buttons with event listeners
+  // Create and append elements for the new layout
+  const closeButton = document.createElement('button');
+  closeButton.className = 'inline-summary-close-btn';
+  closeButton.textContent = 'Close';
+
+  const summaryHeading = document.createElement('h2');
+  summaryHeading.textContent = 'Summary';
+
+  const subjectPara = document.createElement('p');
+  subjectPara.style.fontWeight = 'bold';
+  subjectPara.style.marginTop = '-5px';
+  subjectPara.textContent = data.subject;
+
+  const summaryContent = document.createElement('p');
+  summaryContent.textContent = data.summary;
+
+  const replyHeading = document.createElement('h2');
+  replyHeading.textContent = 'Suggested Reply';
+
+  const replyContent = document.createElement('p');
+  replyContent.textContent = data.reply_draft;
+
+  const buttonGroup = document.createElement('div');
+  buttonGroup.className = 'button-group';
+
   const copySummaryBtn = createCopyButton(data.summary, 'Copy Summary');
   const copyReplyBtn = createCopyButton(data.reply_draft, 'Copy Reply');
-  container.appendChild(copySummaryBtn);
-  container.appendChild(copyReplyBtn);
+  buttonGroup.appendChild(copySummaryBtn);
+  buttonGroup.appendChild(copyReplyBtn);
 
+  // Append all elements to the container in the correct order
+  container.append(closeButton, summaryHeading, subjectPara, summaryContent, replyHeading, replyContent, buttonGroup);
+
+  // Remove the loading class to trigger the expansion animation
   container.classList.remove('loading');
 
   // Add event listener for the new close button
-  container.querySelector('.inline-summary-close-btn').onclick = () => {
+  closeButton.onclick = () => {
     container.classList.remove('visible');
-    
-    // Showing button if email is still open
+    // Show the main button again if the email is still open
     if (!!document.querySelector('[data-legacy-message-id]')) {
       fab.classList.add('visible');
     }
@@ -111,8 +132,7 @@ const observer = new MutationObserver((mutations) => {
   const fab = document.getElementById('summarize-fab');
   const summaryContainer = document.getElementById('inline-summary-container');
   if (!fab || !summaryContainer) return;
-
-  // Most reliable indicator of an open email is the presence of this element
+  
   const isEmailOpen = !!document.querySelector('[data-legacy-message-id]');
 
   if (isEmailOpen) {
