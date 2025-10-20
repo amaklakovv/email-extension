@@ -4,6 +4,8 @@ A Chrome extension that helps you manage your inbox by automatically summarising
 
 It also allows you to summarize any individual email directly within the Gmail interface.
 
+[Video Demo of the Email Summariser](https://youtu.be/xR5xCEttZbI)
+
 ## Problem And My Solution
 Managing a large amount of emails can be overwhelming, especially when you need to read and respond quickly. Based on both my personal experience and others, writing replies can sometimes take longer than expected because you second guess yourself and rewrite multiple times. 
 
